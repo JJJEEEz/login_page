@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'home_page.dart';
+import 'profile_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,7 +65,10 @@ class _LoginPageState extends State<LoginPage> {
             backgroundColor: Colors.green,
           ),
         );
-        // Aquí podrías navegar a la pantalla principal de tu app
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const HomePage()),
+        );
       }
     } on FirebaseAuthException catch (e) {
       String message;
@@ -229,7 +234,7 @@ class _LoginPageState extends State<LoginPage> {
 
                   // Título
                   Text(
-                    'Citas Médicas',
+                    'LoLa',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 32,
