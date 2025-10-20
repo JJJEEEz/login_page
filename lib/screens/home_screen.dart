@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'messages_screen.dart';
 import 'settings_screen.dart';
 
@@ -45,14 +46,58 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class HomeContent extends StatelessWidget {
+class HomeContent extends StatefulWidget {
   const HomeContent({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final user = FirebaseAuth.instance.currentUser;
-    final userName = user?.email?.split('@')[0] ?? 'Usuario';
+  State<HomeContent> createState() => _HomeContentState();
+}
 
+class _HomeContentState extends State<HomeContent> {
+  String _userName = 'Usuario';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserName();
+  }
+
+  Future<void> _loadUserName() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user != null) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('usuarios')
+            .doc(user.uid)
+            .get(const GetOptions(source: Source.serverAndCache));
+
+        if (doc.exists && mounted) {
+          final data = doc.data();
+          if (data != null &&
+              data['nombre'] != null &&
+              data['nombre'].toString().isNotEmpty) {
+            setState(() {
+              _userName = data['nombre'];
+            });
+            return;
+          }
+        }
+      } catch (e) {
+        // Si hay error, usar fallback
+        print('Error al cargar nombre: $e');
+      }
+
+      // Fallback: usar email sin dominio
+      if (mounted) {
+        setState(() {
+          _userName = user.email?.split('@')[0] ?? 'Usuario';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.grey[50],
       appBar: AppBar(
@@ -87,7 +132,7 @@ class HomeContent extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    '¡Hola, $userName!',
+                    '¡Hola, $_userName!',
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 28,

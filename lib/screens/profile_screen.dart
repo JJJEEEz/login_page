@@ -14,6 +14,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _nameController = TextEditingController();
   final _ageController = TextEditingController();
   final _birthPlaceController = TextEditingController();
+  final _phoneController = TextEditingController();
+  final _genderController = TextEditingController();
   final _conditionsController = TextEditingController();
 
   bool _isLoading = false;
@@ -49,6 +51,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _ageController.text = data['edad']?.toString() ?? '';
           _birthPlaceController.text = data['lugarNacimiento'] ?? '';
           _conditionsController.text = data['padecimientos'] ?? '';
+          _phoneController.text = data['telefono'] ?? '';
+          _genderController.text = data['genero'] ?? '';
 
           setState(() {
             _hasLoadError = false;
@@ -121,6 +125,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
               'email': user.email,
               'nombre': _nameController.text.trim(),
               'edad': int.tryParse(_ageController.text) ?? 0,
+              'telefono': _phoneController.text.trim(),
+              'genero': _genderController.text.trim(),
               'lugarNacimiento': _birthPlaceController.text.trim(),
               'padecimientos': _conditionsController.text.trim(),
               'fechaActualizacion': FieldValue.serverTimestamp(),
@@ -325,6 +331,53 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         final age = int.tryParse(value);
                         if (age == null || age < 0 || age > 120) {
                           return 'Por favor ingresa una edad válida';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Género
+                    TextFormField(
+                      controller: _genderController,
+                      decoration: InputDecoration(
+                        labelText: 'Género',
+                        hintText: 'Ej: Masculino',
+                        prefixIcon: const Icon(Icons.transgender_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Por favor ingresa tu género';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Teléfono
+                    TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Teléfono',
+                        hintText: 'Ej: +52 99 9234 5678',
+                        prefixIcon: const Icon(Icons.phone_outlined),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                        fillColor: Colors.white,
+                      ),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return 'Por favor ingresa tu número de teléfono';
                         }
                         return null;
                       },
