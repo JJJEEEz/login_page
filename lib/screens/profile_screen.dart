@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../components/firestore/saveProfile.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -112,34 +113,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isSaving = true);
-
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance
-            .collection('usuarios')
-            .doc(user.uid)
-            .set({
-              'email': user.email,
-              'nombre': _nameController.text.trim(),
-              'edad': int.tryParse(_ageController.text) ?? 0,
-              'telefono': _phoneController.text.trim(),
-              'genero': _genderController.text.trim(),
-              'lugarNacimiento': _birthPlaceController.text.trim(),
-              'padecimientos': _conditionsController.text.trim(),
-              'fechaActualizacion': FieldValue.serverTimestamp(),
-            }, SetOptions(merge: true));
-
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Perfil actualizado exitosamente'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
+      await saveProfile(
+        nombre: _nameController.text.trim(),
+        edad: _ageController.text.trim(),
+        telefono: _phoneController.text.trim(),
+        genero: _genderController.text.trim(),
+        lugarNacimiento: _birthPlaceController.text.trim(),
+        padecimientos: _conditionsController.text.trim(),
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Perfil actualizado exitosamente'),
+            backgroundColor: Colors.green,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {

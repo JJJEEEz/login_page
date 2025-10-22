@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'messages_screen.dart';
 import 'settings_screen.dart';
+import 'agendar_cita_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -179,11 +180,10 @@ class _HomeContentState extends State<HomeContent> {
                       title: 'Agendar una Cita',
                       color: const Color(0xFF4A90E2),
                       onTap: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                              'Función de agendar cita próximamente',
-                            ),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const AgendarCitaScreen(),
                           ),
                         );
                       },

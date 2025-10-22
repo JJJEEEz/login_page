@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:login/screens/userManagementScreen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'profile_screen.dart';
 import 'privacy_screen.dart';
 import 'about_screen.dart';
@@ -144,6 +146,50 @@ class SettingsScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const AboutScreen()),
+              );
+            },
+          ),
+
+          FutureBuilder<DocumentSnapshot>(
+            future: FirebaseAuth.instance.currentUser != null
+                ? FirebaseFirestore.instance
+                      .collection('usuarios')
+                      .doc(FirebaseAuth.instance.currentUser!.uid)
+                      .get()
+                : null,
+            builder: (context, snapshot) {
+              final data = snapshot.data?.data() as Map<String, dynamic>?;
+              final esAdmin = data?['admin'] == true;
+              if (!esAdmin) return const SizedBox.shrink();
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Administración',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _buildSettingItem(
+                    context,
+                    icon: Icons.logout,
+                    title: 'Usuarios',
+                    subtitle: 'Gestionar usuarios',
+                    iconColor: Colors.red,
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const UserManagementScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               );
             },
           ),
