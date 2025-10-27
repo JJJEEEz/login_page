@@ -3,7 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'messages_screen.dart';
 import 'settings_screen.dart';
-import 'agendar_cita_screen.dart';
+import 'appointment_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
