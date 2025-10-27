@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../components/firestore/saveAppointment.dart';
 
 class AppointmentScreen extends StatefulWidget {
   const AppointmentScreen({super.key});
@@ -19,22 +18,12 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
     'podologia',
   ];
 
-  // CRUD State
-  String? editingAppointmentId;
-  DateTime? editingFecha;
-  String? editingHoraInicio;
-  String? editingHoraFin;
-  String? editingMotivo;
-  String? editingDoctorEmail;
-  String? editingPacienteEmail;
-  String? editingAlergias;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFF4A90E2),
-        title: const Text('Medical Appointments'),
+        title: const Text('Agenda de Citas Médicas'),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Column(
@@ -44,7 +33,7 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
             child: Row(
               children: [
                 const Text(
-                  'Specialty:',
+                  'Especialidad:',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 const SizedBox(width: 12),
@@ -71,15 +60,203 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
               ],
             ),
           ),
+          Expanded(
+            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('usuarios')
+                  .where('esDoctor', isEqualTo: true)
+                  .where('especialidad', isEqualTo: selectedEspecialidad)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(child: Text('Error: ${snapshot.error}'));
+                }
+                final doctors = snapshot.data?.docs ?? [];
+                if (doctors.isEmpty) {
+                  return const Center(
+                    child: Text('No hay doctores para esta especialidad.'),
+                  );
+                }
+                return ListView.separated(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: doctors.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  itemBuilder: (context, index) {
+                    final doctor = doctors[index];
+                    final data = doctor.data();
+                    return Card(
+                      child: ListTile(
+                        leading: const Icon(
+                          Icons.medical_services,
+                          color: Colors.green,
+                        ),
+                        title: Text(
+                          data['nombre'] ?? data['email'] ?? 'Sin nombre',
+                        ),
+                        subtitle: Text('Email: ${data['email'] ?? ''}'),
+                        trailing: ElevatedButton(
+                          child: const Text('Agendar cita'),
+                          onPressed: () async {
+                            await _mostrarDialogoCrearCita(data['email']);
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+          const Divider(),
+          const Padding(
+            padding: EdgeInsets.all(8.0),
+            child: Text(
+              'Tus citas',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
           Expanded(child: _buildAppointmentCRUD()),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateOrEditDialog(),
-        child: const Icon(Icons.add),
-        backgroundColor: const Color(0xFF4A90E2),
-        tooltip: 'Create Appointment',
-      ),
+    );
+  }
+
+  Future<void> _mostrarDialogoCrearCita(String doctorEmail) async {
+    final motivoController = TextEditingController();
+    final alergiasController = TextEditingController();
+    final horaController = TextEditingController();
+    final horaFinController = TextEditingController();
+    DateTime? fechaSeleccionada;
+    final pacienteEmail = FirebaseAuth.instance.currentUser?.email ?? '';
+
+    await showDialog(
+      context: context,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return AlertDialog(
+              title: const Text('Agendar cita'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: motivoController,
+                      decoration: const InputDecoration(labelText: 'Motivo'),
+                    ),
+                    TextField(
+                      controller: alergiasController,
+                      decoration: const InputDecoration(labelText: 'Alergias'),
+                    ),
+                    TextField(
+                      controller: horaController,
+                      decoration: const InputDecoration(
+                        labelText: 'Hora inicio (HH:mm)',
+                      ),
+                    ),
+                    TextField(
+                      controller: horaFinController,
+                      decoration: const InputDecoration(
+                        labelText: 'Hora fin (HH:mm)',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        const Text('Fecha:'),
+                        const SizedBox(width: 8),
+                        Text(
+                          fechaSeleccionada == null
+                              ? 'No seleccionada'
+                              : '${fechaSeleccionada!.day}/${fechaSeleccionada!.month}/${fechaSeleccionada!.year}',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.calendar_today),
+                          onPressed: () async {
+                            final picked = await showDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime.now(),
+                              lastDate: DateTime.now().add(
+                                const Duration(days: 365),
+                              ),
+                            );
+                            if (picked != null) {
+                              setState(() {
+                                fechaSeleccionada = picked;
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  child: const Text('Cancelar'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                ElevatedButton(
+                  child: const Text('Guardar'),
+                  onPressed: () async {
+                    if (motivoController.text.isEmpty ||
+                        alergiasController.text.isEmpty ||
+                        horaController.text.isEmpty ||
+                        horaFinController.text.isEmpty ||
+                        fechaSeleccionada == null) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Completa todos los campos.'),
+                        ),
+                      );
+                      return;
+                    }
+                    final overlap = await _checkOverlap(
+                      fechaSeleccionada!,
+                      horaController.text,
+                      horaFinController.text,
+                      null,
+                      doctorEmail,
+                    );
+                    if (overlap) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('El horario se solapa con otra cita.'),
+                        ),
+                      );
+                      return;
+                    }
+                    final citaData = {
+                      'motivo': motivoController.text,
+                      'alergias': alergiasController.text,
+                      'hora': horaController.text,
+                      'horaFin': horaFinController.text,
+                      'emailDoctor': doctorEmail,
+                      'emailPaciente': pacienteEmail,
+                      'fecha': Timestamp.fromDate(fechaSeleccionada!),
+                      'especialidad': selectedEspecialidad,
+                    };
+                    await FirebaseFirestore.instance
+                        .collection('citas')
+                        .add(citaData);
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Cita agendada exitosamente.'),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -99,7 +276,7 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
         }
         final citas = snapshot.data?.docs ?? [];
         if (citas.isEmpty) {
-          return const Center(child: Text('No appointments found.'));
+          return const Center(child: Text('No tienes citas agendadas.'));
         }
         return ListView.separated(
           padding: const EdgeInsets.all(16),
@@ -114,14 +291,14 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                   Icons.medical_services,
                   color: Colors.green,
                 ),
-                title: Text(data['motivo'] ?? 'No reason'),
+                title: Text(data['motivo'] ?? 'Sin motivo'),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Doctor: ${data['emailDoctor'] ?? ''}'),
-                    Text('Date: ${_formatDate(data['fecha'])}'),
-                    Text('Start: ${data['hora'] ?? ''}'),
-                    Text('End: ${data['horaFin'] ?? ''}'),
+                    Text('Fecha: ${_formatDate(data['fecha'])}'),
+                    Text('Inicio: ${data['hora'] ?? ''}'),
+                    Text('Fin: ${data['horaFin'] ?? ''}'),
                     Text('Alergias: ${data['alergias'] ?? ''}'),
                   ],
                 ),
@@ -130,16 +307,15 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                   children: [
                     IconButton(
                       icon: const Icon(Icons.edit, color: Colors.orange),
-                      onPressed: () =>
-                          _showCreateOrEditDialog(editId: cita.id, data: data),
+                      onPressed: () => _mostrarDialogoEditarCita(cita.id, data),
                     ),
                     IconButton(
                       icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => _confirmDelete(cita.id),
+                      onPressed: () => _confirmarEliminarCita(cita.id),
                     ),
                   ],
                 ),
-                onTap: () => _showDetailDialog(data),
+                onTap: () => _mostrarDetalleCita(data),
               ),
             );
           },
@@ -148,52 +324,37 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
     );
   }
 
-  String _formatDate(dynamic fecha) {
-    if (fecha is Timestamp) {
-      final d = fecha.toDate();
-      return '${d.day}/${d.month}/${d.year}';
-    }
-    return fecha?.toString() ?? '';
-  }
-
-  void _showCreateOrEditDialog({String? editId, Map<String, dynamic>? data}) {
-    final motivoController = TextEditingController(text: data?['motivo'] ?? '');
+  Future<void> _mostrarDialogoEditarCita(
+    String editId,
+    Map<String, dynamic> data,
+  ) async {
+    final motivoController = TextEditingController(text: data['motivo'] ?? '');
     final alergiasController = TextEditingController(
-      text: data?['alergias'] ?? '',
+      text: data['alergias'] ?? '',
     );
-    final horaController = TextEditingController(text: data?['hora'] ?? '');
+    final horaController = TextEditingController(text: data['hora'] ?? '');
     final horaFinController = TextEditingController(
-      text: data?['horaFin'] ?? '',
+      text: data['horaFin'] ?? '',
     );
-    DateTime? fechaSeleccionada = data?['fecha'] is Timestamp
-        ? (data!['fecha'] as Timestamp).toDate()
+    DateTime? fechaSeleccionada = data['fecha'] is Timestamp
+        ? (data['fecha'] as Timestamp).toDate()
         : null;
-    final doctorController = TextEditingController(
-      text: data?['emailDoctor'] ?? '',
-    );
-    final pacienteController = TextEditingController(
-      text:
-          data?['emailPaciente'] ??
-          FirebaseAuth.instance.currentUser?.email ??
-          '',
-    );
+    final doctorEmail = data['emailDoctor'] ?? '';
 
-    showDialog(
+    await showDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
             return AlertDialog(
-              title: Text(
-                editId == null ? 'Create Appointment' : 'Edit Appointment',
-              ),
+              title: const Text('Editar cita'),
               content: SingleChildScrollView(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     TextField(
                       controller: motivoController,
-                      decoration: const InputDecoration(labelText: 'Reason'),
+                      decoration: const InputDecoration(labelText: 'Motivo'),
                     ),
                     TextField(
                       controller: alergiasController,
@@ -202,33 +363,23 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                     TextField(
                       controller: horaController,
                       decoration: const InputDecoration(
-                        labelText: 'Start Time',
+                        labelText: 'Hora inicio (HH:mm)',
                       ),
                     ),
                     TextField(
                       controller: horaFinController,
-                      decoration: const InputDecoration(labelText: 'End Time'),
-                    ),
-                    TextField(
-                      controller: doctorController,
                       decoration: const InputDecoration(
-                        labelText: 'Doctor Email',
-                      ),
-                    ),
-                    TextField(
-                      controller: pacienteController,
-                      decoration: const InputDecoration(
-                        labelText: 'Patient Email',
+                        labelText: 'Hora fin (HH:mm)',
                       ),
                     ),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        const Text('Date:'),
+                        const Text('Fecha:'),
                         const SizedBox(width: 8),
                         Text(
                           fechaSeleccionada == null
-                              ? 'Not selected'
+                              ? 'No seleccionada'
                               : '${fechaSeleccionada!.day}/${fechaSeleccionada!.month}/${fechaSeleccionada!.year}',
                         ),
                         IconButton(
@@ -256,38 +407,35 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
               ),
               actions: [
                 TextButton(
-                  child: const Text('Cancel'),
+                  child: const Text('Cancelar'),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
                 ElevatedButton(
-                  child: Text(editId == null ? 'Create' : 'Update'),
+                  child: const Text('Actualizar'),
                   onPressed: () async {
                     if (motivoController.text.isEmpty ||
                         alergiasController.text.isEmpty ||
                         horaController.text.isEmpty ||
                         horaFinController.text.isEmpty ||
-                        doctorController.text.isEmpty ||
-                        pacienteController.text.isEmpty ||
                         fechaSeleccionada == null) {
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Complete all fields.')),
+                        const SnackBar(
+                          content: Text('Completa todos los campos.'),
+                        ),
                       );
                       return;
                     }
-                    // Validar solapamiento
                     final overlap = await _checkOverlap(
                       fechaSeleccionada!,
                       horaController.text,
                       horaFinController.text,
                       editId,
-                      doctorController.text,
+                      doctorEmail,
                     );
                     if (overlap) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
-                          content: Text(
-                            'Time overlaps with another appointment.',
-                          ),
+                          content: Text('El horario se solapa con otra cita.'),
                         ),
                       );
                       return;
@@ -297,28 +445,20 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                       'alergias': alergiasController.text,
                       'hora': horaController.text,
                       'horaFin': horaFinController.text,
-                      'emailDoctor': doctorController.text,
-                      'emailPaciente': pacienteController.text,
+                      'emailDoctor': doctorEmail,
+                      'emailPaciente':
+                          FirebaseAuth.instance.currentUser?.email ?? '',
                       'fecha': Timestamp.fromDate(fechaSeleccionada!),
                       'especialidad': selectedEspecialidad,
                     };
-                    if (editId == null) {
-                      await FirebaseFirestore.instance
-                          .collection('citas')
-                          .add(citaData);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Appointment created.')),
-                      );
-                    } else {
-                      await FirebaseFirestore.instance
-                          .collection('citas')
-                          .doc(editId)
-                          .update(citaData);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Appointment updated.')),
-                      );
-                    }
+                    await FirebaseFirestore.instance
+                        .collection('citas')
+                        .doc(editId)
+                        .update(citaData);
                     Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Cita actualizada.')),
+                    );
                   },
                 ),
               ],
@@ -365,21 +505,19 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
     return TimeOfDay(hour: int.parse(parts[0]), minute: int.parse(parts[1]));
   }
 
-  void _confirmDelete(String citaId) {
+  void _confirmarEliminarCita(String citaId) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Appointment'),
-        content: const Text(
-          'Are you sure you want to delete this appointment?',
-        ),
+        title: const Text('Eliminar cita'),
+        content: const Text('¿Estás seguro de que deseas eliminar esta cita?'),
         actions: [
           TextButton(
-            child: const Text('Cancel'),
+            child: const Text('Cancelar'),
             onPressed: () => Navigator.of(context).pop(),
           ),
           ElevatedButton(
-            child: const Text('Delete'),
+            child: const Text('Eliminar'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
               await FirebaseFirestore.instance
@@ -387,9 +525,9 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
                   .doc(citaId)
                   .delete();
               Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Appointment deleted.')),
-              );
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(const SnackBar(content: Text('Cita eliminada.')));
             },
           ),
         ],
@@ -397,32 +535,42 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
     );
   }
 
-  void _showDetailDialog(Map<String, dynamic> data) {
+  void _mostrarDetalleCita(Map<String, dynamic> data) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Appointment Details'),
+        title: const Text('Detalle de la cita'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Reason: ${data['motivo'] ?? ''}'),
+            Text('Motivo: ${data['motivo'] ?? ''}'),
             Text('Doctor: ${data['emailDoctor'] ?? ''}'),
-            Text('Patient: ${data['emailPaciente'] ?? ''}'),
-            Text('Date: ${_formatDate(data['fecha'])}'),
-            Text('Start: ${data['hora'] ?? ''}'),
-            Text('End: ${data['horaFin'] ?? ''}'),
+            Text('Paciente: ${data['emailPaciente'] ?? ''}'),
+            Text('Fecha: ${_formatDate(data['fecha'])}'),
+            Text('Inicio: ${data['hora'] ?? ''}'),
+            Text('Fin: ${data['horaFin'] ?? ''}'),
             Text('Alergias: ${data['alergias'] ?? ''}'),
-            Text('Specialty: ${data['especialidad'] ?? ''}'),
+            Text('Especialidad: ${data['especialidad'] ?? ''}'),
           ],
         ),
         actions: [
           TextButton(
-            child: const Text('Close'),
+            child: const Text('Cerrar'),
             onPressed: () => Navigator.of(context).pop(),
           ),
         ],
       ),
     );
   }
+
+  String _formatDate(dynamic fecha) {
+    if (fecha is Timestamp) {
+      final d = fecha.toDate();
+      return '${d.day}/${d.month}/${d.year}';
+    }
+    return fecha?.toString() ?? '';
+  }
 }
+
+// ...existing code...
