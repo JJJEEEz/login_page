@@ -183,7 +183,7 @@ class _HomeContentState extends State<HomeContent> {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => const AgendarCitaScreen(),
+                            builder: (context) => const AppointmentScreen(),
                           ),
                         );
                       },
