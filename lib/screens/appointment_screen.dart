@@ -3,20 +3,27 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class AppointmentScreen extends StatefulWidget {
-  const AppointmentScreen({super.key});
+  final String? especialidad;
+  const AppointmentScreen({super.key, this.especialidad});
 
   @override
   State<AppointmentScreen> createState() => _AppointmentScreenState();
 }
 
 class _AppointmentScreenState extends State<AppointmentScreen> {
-  String selectedEspecialidad = 'cardiologia';
+  late String selectedEspecialidad;
   final especialidades = [
     'cardiologia',
     'neurologia',
     'pediatria',
     'podologia',
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    selectedEspecialidad = widget.especialidad ?? 'cardiologia';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,99 +33,271 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
         title: const Text('Agenda de Citas Médicas'),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Column(
+      body: Stack(
         children: [
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
+          Container(
+            color: Colors.grey[100],
+            child: Column(
               children: [
-                const Text(
-                  'Especialidad:',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: DropdownButton<String>(
-                    value: selectedEspecialidad,
-                    items: especialidades
-                        .map(
-                          (e) => DropdownMenuItem(
-                            value: e,
-                            child: Text(e[0].toUpperCase() + e.substring(1)),
+                Padding(
+                  padding: const EdgeInsets.only(
+                    top: 24,
+                    left: 20,
+                    right: 20,
+                    bottom: 8,
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.search, color: Color(0xFF4A90E2)),
+                      const SizedBox(width: 10),
+                      const Text(
+                        'Especialidad:',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18,
+                          color: Color(0xFF4A90E2),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.grey.withOpacity(0.15),
+                                blurRadius: 8,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
                           ),
-                        )
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setState(() {
-                          selectedEspecialidad = val;
-                        });
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: DropdownButtonHideUnderline(
+                              child: DropdownButton<String>(
+                                value: selectedEspecialidad,
+                                items: especialidades
+                                    .map(
+                                      (e) => DropdownMenuItem(
+                                        value: e,
+                                        child: Text(
+                                          e[0].toUpperCase() + e.substring(1),
+                                          style: const TextStyle(
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (val) {
+                                  if (val != null) {
+                                    setState(() {
+                                      selectedEspecialidad = val;
+                                    });
+                                  }
+                                },
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+                    stream: FirebaseFirestore.instance
+                        .collection('usuarios')
+                        .where('esDoctor', isEqualTo: true)
+                        .where('especialidad', isEqualTo: selectedEspecialidad)
+                        .snapshots(),
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState == ConnectionState.waiting) {
+                        return const Center(child: CircularProgressIndicator());
                       }
+                      if (snapshot.hasError) {
+                        return Center(child: Text('Error: ${snapshot.error}'));
+                      }
+                      final doctors = snapshot.data?.docs ?? [];
+                      if (doctors.isEmpty) {
+                        return const Center(
+                          child: Text(
+                            'No hay doctores para esta especialidad.',
+                          ),
+                        );
+                      }
+                      return ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: doctors.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 16),
+                        itemBuilder: (context, index) {
+                          final doctor = doctors[index];
+                          final data = doctor.data();
+                          return Card(
+                            elevation: 4,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            color: Colors.white,
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 8,
+                                horizontal: 12,
+                              ),
+                              child: ListTile(
+                                leading: CircleAvatar(
+                                  backgroundColor: const Color(0xFF4A90E2),
+                                  child: const Icon(
+                                    Icons.medical_services,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                title: Text(
+                                  data['nombre'] ??
+                                      data['email'] ??
+                                      'Sin nombre',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 17,
+                                  ),
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        const Icon(
+                                          Icons.email,
+                                          size: 16,
+                                          color: Colors.grey,
+                                        ),
+                                        const SizedBox(width: 4),
+                                        Text(
+                                          data['email'] ?? '',
+                                          style: const TextStyle(fontSize: 14),
+                                        ),
+                                      ],
+                                    ),
+                                    if (data['especialidad'] != null)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 2),
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.local_hospital,
+                                              size: 16,
+                                              color: Colors.grey,
+                                            ),
+                                            const SizedBox(width: 4),
+                                            Text(
+                                              data['especialidad'],
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                trailing: ElevatedButton.icon(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: const Color(0xFF4A90E2),
+                                    foregroundColor: Colors.white,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  icon: const Icon(Icons.event_available),
+                                  label: const Text('Agendar'),
+                                  onPressed: () async {
+                                    await _mostrarDialogoCrearCita(
+                                      data['email'],
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      );
                     },
                   ),
                 ),
               ],
             ),
           ),
-          Expanded(
-            child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-              stream: FirebaseFirestore.instance
-                  .collection('usuarios')
-                  .where('esDoctor', isEqualTo: true)
-                  .where('especialidad', isEqualTo: selectedEspecialidad)
-                  .snapshots(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-                if (snapshot.hasError) {
-                  return Center(child: Text('Error: ${snapshot.error}'));
-                }
-                final doctors = snapshot.data?.docs ?? [];
-                if (doctors.isEmpty) {
-                  return const Center(
-                    child: Text('No hay doctores para esta especialidad.'),
-                  );
-                }
-                return ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: doctors.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
-                  itemBuilder: (context, index) {
-                    final doctor = doctors[index];
-                    final data = doctor.data();
-                    return Card(
-                      child: ListTile(
-                        leading: const Icon(
-                          Icons.medical_services,
-                          color: Colors.green,
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF4A90E2),
+                    elevation: 8,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: const Icon(Icons.calendar_today),
+                  label: const Text(
+                    'Tus citas',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                  ),
+                  onPressed: () {
+                    showModalBottomSheet(
+                      context: context,
+                      isScrollControlled: true,
+                      shape: const RoundedRectangleBorder(
+                        borderRadius: BorderRadius.vertical(
+                          top: Radius.circular(24),
                         ),
-                        title: Text(
-                          data['nombre'] ?? data['email'] ?? 'Sin nombre',
-                        ),
-                        subtitle: Text('Email: ${data['email'] ?? ''}'),
-                        trailing: ElevatedButton(
-                          child: const Text('Agendar cita'),
-                          onPressed: () async {
-                            await _mostrarDialogoCrearCita(data['email']);
-                          },
+                      ),
+                      builder: (context) => FractionallySizedBox(
+                        heightFactor: 0.85,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8.0,
+                            vertical: 16.0,
+                          ),
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 60,
+                                height: 8,
+                                margin: const EdgeInsets.only(bottom: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[400],
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                              ),
+                              const Text(
+                                'Tus citas',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 22,
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Expanded(child: _buildAppointmentCRUD()),
+                            ],
+                          ),
                         ),
                       ),
                     );
                   },
-                );
-              },
+                ),
+              ),
             ),
           ),
-          const Divider(),
-          const Padding(
-            padding: EdgeInsets.all(8.0),
-            child: Text(
-              'Tus citas',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(child: _buildAppointmentCRUD()),
         ],
       ),
     );

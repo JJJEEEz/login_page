@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'messages_screen.dart';
+import 'messages_screen2.dart';
 import 'settings_screen.dart';
 import 'appointment_screen.dart';
+import '../components/doctor_detail_modal.dart';
+import '../components/specialist_doctor_list_modal.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,7 +19,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final List<Widget> _screens = [
     const HomeContent(),
-    const MessagesScreen(),
+    const MessagesScreen2(),
     const SettingsScreen(),
   ];
 
@@ -56,6 +58,8 @@ class HomeContent extends StatefulWidget {
 
 class _HomeContentState extends State<HomeContent> {
   String _userName = 'Usuario';
+  final Set<String> _dismissedDoctors =
+      {}; // guarda doctores descartados por Dismissible
 
   @override
   void initState() {
@@ -115,199 +119,305 @@ class _HomeContentState extends State<HomeContent> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header con mensaje de bienvenida
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Color(0xFF4A90E2),
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(30),
-                  bottomRight: Radius.circular(30),
+      body: RefreshIndicator(
+        displacement: 40,
+        onRefresh: () async {
+          // ejemplo simple: recargar nombre de usuario y mostrar snackbar
+          setState(() {
+            _dismissedDoctors.clear();
+          });
+          await _loadUserName();
+          // asegurar que la UI refleje cualquier cambio del nombre
+          if (mounted) setState(() {});
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Contenido actualizado')),
+          );
+        },
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header con mensaje de bienvenida
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  color: Color(0xFF4A90E2),
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(30),
+                    bottomRight: Radius.circular(30),
+                  ),
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '¡Hola, $_userName!',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  const Text(
-                    '¿En qué podemos ayudarte?',
-                    style: TextStyle(color: Colors.white70, fontSize: 16),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Barra de búsqueda
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                    child: const TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Buscar especialista o servicio...',
-                        border: InputBorder.none,
-                        icon: Icon(Icons.search, color: Colors.grey),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '¡Hola, $_userName!',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 24),
-
-            // Servicios principales
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildServiceCard(
-                      context,
-                      icon: Icons.calendar_today,
-                      title: 'Agendar una Cita',
-                      color: const Color(0xFF4A90E2),
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => const AppointmentScreen(),
-                          ),
-                        );
-                      },
+                    const SizedBox(height: 8),
+                    const Text(
+                      '¿En qué podemos ayudarte?',
+                      style: TextStyle(color: Colors.white70, fontSize: 16),
                     ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildServiceCard(
-                      context,
-                      icon: Icons.health_and_safety,
-                      title: 'Consejos Médicos',
-                      color: const Color(0xFF66BB6A),
-                      onTap: () {
-                        _showMedicalTips(context);
-                      },
+                    const SizedBox(height: 20),
+
+                    // Barra de búsqueda
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(30),
+                      ),
+                      child: const TextField(
+                        decoration: InputDecoration(
+                          hintText: 'Buscar especialista o servicio...',
+                          border: InputBorder.none,
+                          icon: Icon(Icons.search, color: Colors.grey),
+                        ),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 32),
+              const SizedBox(height: 24),
 
-            // Sección de Especialistas
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Especialistas',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(onPressed: () {}, child: const Text('Ver todos')),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            SizedBox(
-              height: 120,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
+              // Servicios principales
+              Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                children: [
-                  _buildSpecialistCard(
-                    icon: Icons.favorite,
-                    name: 'Cardiología',
-                    color: Colors.red[400]!,
-                  ),
-                  _buildSpecialistCard(
-                    icon: Icons.psychology,
-                    name: 'Neurología',
-                    color: Colors.purple[400]!,
-                  ),
-                  _buildSpecialistCard(
-                    icon: Icons.child_care,
-                    name: 'Pediatría',
-                    color: Colors.orange[400]!,
-                  ),
-                  _buildSpecialistCard(
-                    icon: Icons.visibility,
-                    name: 'Oftalmología',
-                    color: Colors.blue[400]!,
-                  ),
-                  _buildSpecialistCard(
-                    icon: Icons.face,
-                    name: 'Dermatología',
-                    color: Colors.pink[400]!,
-                  ),
-                ],
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildServiceCard(
+                        context,
+                        icon: Icons.calendar_today,
+                        title: 'Agendar una Cita',
+                        color: const Color(0xFF4A90E2),
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const AppointmentScreen(),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildServiceCard(
+                        context,
+                        icon: Icons.health_and_safety,
+                        title: 'Consejos Médicos',
+                        color: const Color(0xFF66BB6A),
+                        onTap: () {
+                          _showMedicalTips(context);
+                        },
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 32),
+              const SizedBox(height: 32),
 
-            // Sección de Doctores Populares
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Doctores Destacados',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(onPressed: () {}, child: const Text('Ver todos')),
-                ],
+              // Sección de Especialistas
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Especialistas',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 16),
+              const SizedBox(height: 16),
 
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Column(
-                children: [
-                  _buildDoctorCard(
-                    name: 'Dr. Juan Pérez',
-                    specialty: 'Cardiólogo',
-                    rating: 4.9,
-                    reviews: 127,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDoctorCard(
-                    name: 'Dra. María García',
-                    specialty: 'Pediatra',
-                    rating: 4.8,
-                    reviews: 98,
-                  ),
-                  const SizedBox(height: 12),
-                  _buildDoctorCard(
-                    name: 'Dr. Carlos Rodríguez',
-                    specialty: 'Neurólogo',
-                    rating: 4.7,
-                    reviews: 85,
-                  ),
-                ],
+              SizedBox(
+                height: 120,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  children: [
+                    _buildSpecialistCard(
+                      icon: Icons.favorite,
+                      name: 'Cardiología',
+                      color: Colors.red[400]!,
+                    ),
+                    _buildSpecialistCard(
+                      icon: Icons.psychology,
+                      name: 'Neurología',
+                      color: Colors.purple[400]!,
+                    ),
+                    _buildSpecialistCard(
+                      icon: Icons.child_care,
+                      name: 'Pediatría',
+                      color: Colors.orange[400]!,
+                    ),
+                    _buildSpecialistCard(
+                      icon: Icons.visibility,
+                      name: 'Oftalmología',
+                      color: Colors.blue[400]!,
+                    ),
+                    _buildSpecialistCard(
+                      icon: Icons.face,
+                      name: 'Dermatología',
+                      color: Colors.pink[400]!,
+                    ),
+                  ],
+                ),
               ),
-            ),
 
-            const SizedBox(height: 24),
-          ],
+              const SizedBox(height: 32),
+
+              // Sección de Doctores Populares
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Doctores Destacados',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: StreamBuilder(
+                  stream: FirebaseFirestore.instance
+                      .collection('usuarios')
+                      .where('esDoctor', isEqualTo: true)
+                      .limit(3)
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Error: ${snapshot.error}'));
+                    }
+                    final doctors = snapshot.data?.docs ?? [];
+                    if (doctors.isEmpty) {
+                      return const Center(
+                        child: Text('No hay doctores destacados.'),
+                      );
+                    }
+                    return Column(
+                      children: doctors.map((doc) {
+                        final data = doc.data();
+                        // si fue descartado previamente, no mostrarlo
+                        if (_dismissedDoctors.contains(doc.id))
+                          return const SizedBox.shrink();
+                        return Column(
+                          children: [
+                            Dismissible(
+                              key: Key(doc.id),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 20),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.9),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.delete,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              onDismissed: (direction) {
+                                setState(() {
+                                  _dismissedDoctors.add(doc.id);
+                                });
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      '${data['nombre'] ?? 'Doctor'} descartado',
+                                    ),
+                                    action: SnackBarAction(
+                                      label: 'Deshacer',
+                                      onPressed: () {
+                                        setState(() {
+                                          _dismissedDoctors.remove(doc.id);
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.vertical(
+                                        top: Radius.circular(20),
+                                      ),
+                                    ),
+                                    builder: (context) => DoctorDetailModal(
+                                      doctorData: data,
+                                      onSchedule: () {
+                                        Navigator.pop(context);
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (context) =>
+                                                AppointmentScreen(),
+                                          ),
+                                        );
+                                      },
+                                    ),
+                                  );
+                                },
+                                child: _buildDoctorCard(
+                                  name:
+                                      data['nombre'] ??
+                                      data['email'] ??
+                                      'Sin nombre',
+                                  specialty:
+                                      data['especialidad'] ??
+                                      'Sin especialidad',
+                                  rating: data['rating'] != null
+                                      ? (data['rating'] as num).toDouble()
+                                      : 0.0,
+                                  reviews: data['reviews'] != null
+                                      ? (data['reviews'] as num).toInt()
+                                      : 0,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                          ],
+                        );
+                      }).toList(),
+                    );
+                  },
+                ),
+              ),
+
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       ),
     );
@@ -359,39 +469,62 @@ class _HomeContentState extends State<HomeContent> {
     required String name,
     required Color color,
   }) {
-    return Container(
-      width: 100,
-      margin: const EdgeInsets.only(right: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+    return GestureDetector(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              shape: BoxShape.circle,
+          builder: (context) => SizedBox(
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: SpecialistDoctorListModal(especialidad: name),
+          ),
+        );
+      },
+      child: Container(
+        width: 120,
+        margin: const EdgeInsets.only(right: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
             ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            name,
-            textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
-          ),
-        ],
+          ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: Text(
+                name,
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -456,10 +589,6 @@ class _HomeContentState extends State<HomeContent> {
                 ),
               ],
             ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.arrow_forward_ios, size: 18),
-            onPressed: () {},
           ),
         ],
       ),

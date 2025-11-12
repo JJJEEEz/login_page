@@ -11,7 +11,11 @@ plugins {
 android {
     namespace = "com.example.login"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    // ndkVersion = flutter.ndkVersion
+    // Se comenta la forzada de ndkVersion porque en algunos entornos la NDK indicada
+    // puede no estar instalada o estar corrupta (causa de error CXX1101).
+    // Si necesitas fijar una versión concreta, descomenta y asegúrate de que
+    // esa versión está instalada en el Android SDK (sdkmanager --install "ndk;<version>").
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
