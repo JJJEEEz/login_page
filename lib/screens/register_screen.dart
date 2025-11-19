@@ -21,6 +21,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   bool _isPasswordVisible = false;
   bool _isLoading = false;
+  bool _isDoctor = false;
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
@@ -42,7 +43,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
             email: emailController.text.trim(),
             password: passwordController.text.trim(),
           );
-      // Guardar perfil mínimo tras registro
+      // Guardar perfil mínimo tras registro (incluye rol seleccionado)
       await saveProfile(
         nombre: '',
         edad: '',
@@ -50,7 +51,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         genero: '',
         lugarNacimiento: '',
         padecimientos: '',
-        esDoctor: false,
+        esDoctor: _isDoctor,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -270,6 +271,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     },
                   ),
                   const SizedBox(height: 24),
+
+                  // Selector de rol: Paciente o Médico
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: DropdownButtonHideUnderline(
+                      child: DropdownButton<bool>(
+                        value: _isDoctor,
+                        items: const [
+                          DropdownMenuItem(
+                            value: false,
+                            child: Text('Paciente'),
+                          ),
+                          DropdownMenuItem(value: true, child: Text('Médico')),
+                        ],
+                        onChanged: (v) =>
+                            setState(() => _isDoctor = v ?? false),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
 
                   // Register Button
                   SizedBox(

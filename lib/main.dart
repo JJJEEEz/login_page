@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'routes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,25 +38,31 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      // Verificar si hay un usuario autenticado
-      home: StreamBuilder<User?>(
-        stream: FirebaseAuth.instance.authStateChanges(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            );
-          }
-
-          if (snapshot.hasData) {
-            // Usuario autenticado, ir a Home
-            return const HomeScreen();
-          }
-
-          // No hay usuario, ir a Login
-          return const LoginScreen();
-        },
-      ),
+      // Usar rutas nombradas y onGenerateRoute
+      initialRoute: '/', // Home o Login según autenticación
+      onGenerateRoute: (settings) {
+        // Si es la ruta inicial, decidir si mostrar Home o Login
+        if (settings.name == AppRoutes.home) {
+          return MaterialPageRoute(
+            builder: (context) => StreamBuilder<User?>(
+              stream: FirebaseAuth.instance.authStateChanges(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Scaffold(
+                    body: Center(child: CircularProgressIndicator()),
+                  );
+                }
+                if (snapshot.hasData) {
+                  return const HomeScreen();
+                }
+                return const LoginScreen();
+              },
+            ),
+          );
+        }
+        // Para otras rutas, delegar a AppRoutes
+        return AppRoutes.onGenerateRoute(settings);
+      },
     );
   }
 }

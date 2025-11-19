@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'messages_screen2.dart';
 import 'settings_screen.dart';
 import 'appointment_screen.dart';
+import '../routes.dart';
 import '../components/doctor_detail_modal.dart';
 import '../components/specialist_doctor_list_modal.dart';
 
@@ -60,6 +61,7 @@ class _HomeContentState extends State<HomeContent> {
   String _userName = 'Usuario';
   final Set<String> _dismissedDoctors =
       {}; // guarda doctores descartados por Dismissible
+  bool _isDoctor = false;
 
   @override
   void initState() {
@@ -83,6 +85,7 @@ class _HomeContentState extends State<HomeContent> {
               data['nombre'].toString().isNotEmpty) {
             setState(() {
               _userName = data['nombre'];
+              _isDoctor = data['esDoctor'] == true;
             });
             return;
           }
@@ -165,20 +168,41 @@ class _HomeContentState extends State<HomeContent> {
                     ),
                     const SizedBox(height: 20),
 
-                    // Barra de búsqueda
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      child: const TextField(
-                        decoration: InputDecoration(
-                          hintText: 'Buscar especialista o servicio...',
-                          border: InputBorder.none,
-                          icon: Icon(Icons.search, color: Colors.grey),
+                    // Barra de búsqueda + botón de gráficas
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(30),
+                            ),
+                            child: const TextField(
+                              decoration: InputDecoration(
+                                hintText: 'Buscar especialista o servicio...',
+                                border: InputBorder.none,
+                                icon: Icon(Icons.search, color: Colors.grey),
+                              ),
+                            ),
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        Material(
+                          color: Colors.white,
+                          shape: const CircleBorder(),
+                          child: IconButton(
+                            tooltip: 'Ver gráficas',
+                            icon: const Icon(
+                              Icons.insert_chart,
+                              color: Color(0xFF4A90E2),
+                            ),
+                            onPressed: () {
+                              Navigator.pushNamed(context, AppRoutes.graphics);
+                            },
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -191,6 +215,7 @@ class _HomeContentState extends State<HomeContent> {
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
                   children: [
+                    // Primera tarjeta: siempre 'Agendar una Cita'
                     Expanded(
                       child: _buildServiceCard(
                         context,
@@ -198,24 +223,27 @@ class _HomeContentState extends State<HomeContent> {
                         title: 'Agendar una Cita',
                         color: const Color(0xFF4A90E2),
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const AppointmentScreen(),
-                            ),
-                          );
+                          Navigator.pushNamed(context, AppRoutes.appointments);
                         },
                       ),
                     ),
                     const SizedBox(width: 16),
+
+                    // Segunda tarjeta: si es doctor -> 'Ver citas' (Dashboard), si no -> 'Consejos Médicos'
                     Expanded(
                       child: _buildServiceCard(
                         context,
-                        icon: Icons.health_and_safety,
-                        title: 'Consejos Médicos',
+                        icon: _isDoctor
+                            ? Icons.incomplete_circle
+                            : Icons.health_and_safety,
+                        title: _isDoctor ? 'Metricas' : 'Consejos Médicos',
                         color: const Color(0xFF66BB6A),
                         onTap: () {
-                          _showMedicalTips(context);
+                          if (_isDoctor) {
+                            Navigator.pushNamed(context, AppRoutes.dashboard);
+                          } else {
+                            _showMedicalTips(context);
+                          }
                         },
                       ),
                     ),

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../components/appointment_dialog.dart';
+import '../routes.dart';
 
 class AppointmentScreen extends StatefulWidget {
   final String? especialidad;
@@ -304,138 +306,13 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
   }
 
   Future<void> _mostrarDialogoCrearCita(String doctorEmail) async {
-    final motivoController = TextEditingController();
-    final alergiasController = TextEditingController();
-    final horaController = TextEditingController();
-    final horaFinController = TextEditingController();
-    DateTime? fechaSeleccionada;
-    final pacienteEmail = FirebaseAuth.instance.currentUser?.email ?? '';
-
+    // Mostrar el componente AppointmentDialog reusable
     await showDialog(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Agendar cita'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    TextField(
-                      controller: motivoController,
-                      decoration: const InputDecoration(labelText: 'Motivo'),
-                    ),
-                    TextField(
-                      controller: alergiasController,
-                      decoration: const InputDecoration(labelText: 'Alergias'),
-                    ),
-                    TextField(
-                      controller: horaController,
-                      decoration: const InputDecoration(
-                        labelText: 'Hora inicio (HH:mm)',
-                      ),
-                    ),
-                    TextField(
-                      controller: horaFinController,
-                      decoration: const InputDecoration(
-                        labelText: 'Hora fin (HH:mm)',
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        const Text('Fecha:'),
-                        const SizedBox(width: 8),
-                        Text(
-                          fechaSeleccionada == null
-                              ? 'No seleccionada'
-                              : '${fechaSeleccionada!.day}/${fechaSeleccionada!.month}/${fechaSeleccionada!.year}',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.calendar_today),
-                          onPressed: () async {
-                            final picked = await showDatePicker(
-                              context: context,
-                              initialDate: DateTime.now(),
-                              firstDate: DateTime.now(),
-                              lastDate: DateTime.now().add(
-                                const Duration(days: 365),
-                              ),
-                            );
-                            if (picked != null) {
-                              setState(() {
-                                fechaSeleccionada = picked;
-                              });
-                            }
-                          },
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  child: const Text('Cancelar'),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-                ElevatedButton(
-                  child: const Text('Guardar'),
-                  onPressed: () async {
-                    if (motivoController.text.isEmpty ||
-                        alergiasController.text.isEmpty ||
-                        horaController.text.isEmpty ||
-                        horaFinController.text.isEmpty ||
-                        fechaSeleccionada == null) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Completa todos los campos.'),
-                        ),
-                      );
-                      return;
-                    }
-                    final overlap = await _checkOverlap(
-                      fechaSeleccionada!,
-                      horaController.text,
-                      horaFinController.text,
-                      null,
-                      doctorEmail,
-                    );
-                    if (overlap) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('El horario se solapa con otra cita.'),
-                        ),
-                      );
-                      return;
-                    }
-                    final citaData = {
-                      'motivo': motivoController.text,
-                      'alergias': alergiasController.text,
-                      'hora': horaController.text,
-                      'horaFin': horaFinController.text,
-                      'emailDoctor': doctorEmail,
-                      'emailPaciente': pacienteEmail,
-                      'fecha': Timestamp.fromDate(fechaSeleccionada!),
-                      'especialidad': selectedEspecialidad,
-                    };
-                    await FirebaseFirestore.instance
-                        .collection('citas')
-                        .add(citaData);
-                    Navigator.of(context).pop();
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Cita agendada exitosamente.'),
-                      ),
-                    );
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (_) => AppointmentDialog(
+        doctorEmail: doctorEmail,
+        especialidad: selectedEspecialidad,
+      ),
     );
   }
 
@@ -689,24 +566,42 @@ class _AppointmentScreenState extends State<AppointmentScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Eliminar cita'),
-        content: const Text('¿Estás seguro de que deseas eliminar esta cita?'),
+        content: const Text('¿Estás seguro de que deseas cancelar esta cita?'),
         actions: [
           TextButton(
             child: const Text('Cancelar'),
             onPressed: () => Navigator.of(context).pop(),
           ),
           ElevatedButton(
-            child: const Text('Eliminar'),
+            child: const Text('Cancelar cita'),
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () async {
-              await FirebaseFirestore.instance
+              final docRef = FirebaseFirestore.instance
                   .collection('citas')
-                  .doc(citaId)
-                  .delete();
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(
-                context,
-              ).showSnackBar(const SnackBar(content: Text('Cita eliminada.')));
+                  .doc(citaId);
+              final docSnap = await docRef.get();
+              if (docSnap.exists) {
+                final data = docSnap.data();
+                await FirebaseFirestore.instance
+                    .collection('citas canceladas')
+                    .add(data!);
+                await docRef.delete();
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Cita cancelada y movida a "citas canceladas".',
+                    ),
+                  ),
+                );
+              } else {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('No se encontró la cita para cancelar.'),
+                  ),
+                );
+              }
             },
           ),
         ],

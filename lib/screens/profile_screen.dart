@@ -23,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool _isSaving = false;
   bool _hasLoadError = false;
   String _errorMessage = '';
+  bool _isDoctor = false;
 
   @override
   void initState() {
@@ -54,6 +55,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _conditionsController.text = data['padecimientos'] ?? '';
           _phoneController.text = data['telefono'] ?? '';
           _genderController.text = data['genero'] ?? '';
+          _isDoctor = data['esDoctor'] == true;
 
           setState(() {
             _hasLoadError = false;
@@ -122,6 +124,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         genero: _genderController.text.trim(),
         lugarNacimiento: _birthPlaceController.text.trim(),
         padecimientos: _conditionsController.text.trim(),
+        esDoctor: _isDoctor,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -443,6 +446,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
 
                     const SizedBox(height: 24),
+
+                    // Selector de rol
+                    Row(
+                      children: [
+                        const Text(
+                          'Rol:',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DropdownButton<bool>(
+                            value: _isDoctor,
+                            items: const [
+                              DropdownMenuItem(
+                                value: false,
+                                child: Text('Paciente'),
+                              ),
+                              DropdownMenuItem(
+                                value: true,
+                                child: Text('Médico'),
+                              ),
+                            ],
+                            onChanged: (v) {
+                              setState(() {
+                                _isDoctor = v ?? false;
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
 
                     // Botón de guardar
                     SizedBox(
